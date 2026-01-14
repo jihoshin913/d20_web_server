@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* DESIGN MATCHING INDEX.HTML & UPLOAD.HTML */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 { text-align: center; color: #333; margin-bottom: 0.5em; }
+        
+        /* Navigation */
+        .nav-bar { margin-bottom: 20px; text-align: left; }
+        .back-link { 
+            text-decoration: none; 
+            color: #4CAF50;
+            font-weight: bold; 
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        /* Viewer Section */
+        .meta-info { 
+            text-align: center; 
+            color: #666; 
+            margin-bottom: 2em; 
+            font-size: 0.9em; 
+        }
+        .tag-badge { 
+            background: #e8f5e9; 
+            color: #2e7d32; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-weight: bold; 
+        }
+
+        #markdown-content {
+            background: #fafafa;
+            border: 1px solid #eee;
+            padding: 30px;
+            border-radius: 4px;
+            min-height: 150px;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        /* Edit Form Section */
+        .edit-section { 
+            border-top: 2px solid #f0f2f5; 
+            padding-top: 20px; 
+            margin-top: 20px; 
+        }
+        .edit-section h2 { font-size: 1.2em; margin-bottom: 15px; }
+
+        form { display: flex; flex-direction: column; }
+        label { margin-bottom: 0.5em; font-weight: bold; color: #555; }
+        
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="file"] { margin-bottom: 20px; }
+        
+        input:focus { outline: none; border-color: #4CAF50; }
+
+        button {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #45a049; }
+
+        /* Utilities */
+        .loading { text-align: center; color: #666; font-style: italic; margin-top: 20px;}
+        .error { color: #c62828; background: #ffebee; padding: 15px; border-radius: 4px; display: none; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav-bar">
+            <a href="/static/index.html" class="back-link">← Back to Dashboard</a>
+        </div>
+
+        <div id="error-msg" class="error"></div>
+        <div id="loading" class="loading">Loading document...</div>
+
+        <div id="main-view" style="display: none;">
+            <h1 id="display-name"></h1>
+            <div class="meta-info">
+                <span id="display-tag" class="tag-badge"></span> &nbsp;|&nbsp; 
+                Uploaded: <span id="display-date"></span>
+            </div>
+
+            <div id="markdown-content"></div>
+
+            <div class="edit-section">
+                <h2>Edit Document</h2>
+                <form id="updateForm">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" required>
+
+                    <label for="tag">Tag</label>
+                    <input type="text" id="tag" name="tag" required>
+
+                    <label for="markdownFile">Replace File (Optional)</label>
+                    <input type="file" id="markdownFile" name="markdownFile" accept=".md">
+                    
+                    <button type="button" id="updateButton">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const docId = urlParams.get('id');
+        
+        // --- 2. INITIALIZATION ---
+        if (!docId) {
+            showError("No Document ID provided.");
+        } else {
+            loadDocumentData(docId);
+        }
+
+        // --- 3. FETCH LOGIC (READ) ---
+        async function loadDocumentData(id) {
+            try {
+                // Fetch Metadata
+                const metaRes = await fetch(`/api/file_data/${id}`);
+                if (!metaRes.ok) throw new Error("Could not find document details");
+                const metaData = await metaRes.json();
+
+                // Fetch Content
+                const contentRes = await fetch(`/api/file/${id}`);
+                let markdownText = "*No content found*";
+                
+                if (contentRes.ok) {
+                    const contentData = await contentRes.json();
+                    markdownText = contentData.content || contentData; 
+                }
+
+                renderPage(metaData, markdownText);
+
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        function renderPage(meta, content) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('main-view').style.display = 'block';
+
+            // Populate View
+            document.getElementById('display-name').textContent = meta.name;
+            document.getElementById('display-tag').textContent = meta.tag;
+            const dateStr = meta.uploadTime ? new Date(meta.uploadTime).toLocaleDateString() : 'Unknown';
+            document.getElementById('display-date').textContent = dateStr;
+            
+            document.getElementById('markdown-content').innerHTML = marked.parse(content);
+
+            // Populate Form
+            document.getElementById('name').value = meta.name;
+            document.getElementById('tag').value = meta.tag;
+        }
+
+        // --- 4. UPDATE LOGIC (WRITE) ---
+        const updateButton = document.getElementById('updateButton');
+        
+        updateButton.addEventListener('click', async () => {
+            const name = document.getElementById('name').value;
+            const tag = document.getElementById('tag').value;
+            const fileInput = document.getElementById('markdownFile');
+            const file = fileInput.files[0];
+
+            updateButton.disabled = true;
+            updateButton.textContent = "Saving...";
+
+            try {
+                // STEP A: If there is a file, update content
+                if (file) {
+                    await updateFileContent(file);
+                }
+
+                // STEP B: Update Metadata
+                // Matches logic of upload.html (Sending ID and time in body)
+                await updateMetadata(name, tag);
+
+                alert("Document updated successfully!");
+                window.location.reload();
+
+            } catch (error) {
+                console.error(error);
+                alert("Update failed: " + error.message);
+                updateButton.disabled = false;
+                updateButton.textContent = "Save Changes";
+            }
+        });
+
+        function updateFileContent(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const markdownContent = event.target.result;
+                        
+                        const response = await fetch(`/api/file/${docId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: markdownContent })
+                        });
+
+                        if (!response.ok) {
+                            // LOG THE ACTUAL SERVER ERROR
+                            const errText = await response.text();
+                            throw new Error(`File Update (${response.status}): ${errText}`);
+                        }
+                        resolve();
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        async function updateMetadata(name, tag) {
+            const data = {
+                name: name,
+                tag: tag,
+                id: docId,
+                uploadTime: new Date().toISOString() // Include time like upload.html
+            };
+
+            // If backend supports upsert, this is safer than /api/file_data/ID
+            const response = await fetch(`/api/file_data`, {
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                // If base endpoint fails, try specific ID endpoint as fallback
+                console.warn("Base endpoint failed, trying specific ID endpoint...");
+                const fallbackResponse = await fetch(`/api/file_data/${docId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!fallbackResponse.ok) {
+                     const errText = await fallbackResponse.text();
+                     throw new Error(`Metadata Update (${fallbackResponse.status}): ${errText}`);
+                }
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            const errEl = document.getElementById('error-msg');
+            errEl.textContent = msg;
+            errEl.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

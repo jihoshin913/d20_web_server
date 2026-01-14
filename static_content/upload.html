@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Document</title>
+    <style>
+        /* DESIGN MATCHING INDEX.HTML & ENTRY.HTML */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px; /* Slightly narrower for a form */
+            margin: 50px auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fff; /* Matching the clean white/gray look */
+        }
+
+        /* Navigation */
+        .nav-bar { margin-bottom: 20px; }
+        .back-link { 
+            text-decoration: none; 
+            color: #4CAF50; /* Green Link */
+            font-weight: bold; 
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        h1 { color: #333; text-align: center; }
+
+        /* Form Container */
+        .container {
+            background-color: #f9f9f9; /* Light gray box like the filters/edit areas */
+            padding: 40px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="text"], input[type="file"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            width: 100%;
+            box-sizing: border-box; /* Ensures padding doesn't break width */
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4CAF50; /* Green Focus */
+        }
+
+        button {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #4CAF50; /* Green Button */
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #45a049; /* Darker Green */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav-bar">
+        <a href="/static/index.html" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <h1>Upload New Document</h1>
+
+    <div class="container">
+        <form id="uploadForm">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" placeholder="e.g. Project Specs v1" required>
+
+            <label for="tag">Tag</label>
+            <input type="text" id="tag" name="tag" placeholder="e.g. Engineering" required>
+
+            <label for="markdownFile">Select File</label>
+            <input type="file" id="markdownFile" name="markdownFile" accept=".md" required>
+
+            <button type="button" id="uploadButton">Upload Document</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const uploadButton = document.getElementById('uploadButton');
+
+        uploadButton.addEventListener('click', async () => {
+            const name = document.getElementById('name').value;
+            const tag = document.getElementById('tag').value;
+            const fileInput = document.getElementById('markdownFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a markdown file.');
+                return;
+            }
+            if (!name) {
+                alert('Please enter a name.');
+                return;
+            }
+
+            // Visual feedback
+            uploadButton.disabled = true;
+            uploadButton.textContent = "Uploading...";
+
+            const reader = new FileReader();
+            
+            reader.onload = async (event) => {
+                try {
+                    const markdownContent = event.target.result;
+                    
+                    // 1. Upload Content
+                    const requestBody = JSON.stringify({ content: markdownContent });
+                    const response = await fetch('/api/file', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+
+                    if (!response.ok) throw new Error('Content upload failed: ' + response.statusText);
+
+                    const responseData = await response.json();
+                    const newId = responseData.id;
+                    const uploadTime = new Date().toISOString();
+                    
+                    // 2. Upload Metadata
+                    const data = {
+                        name: name,
+                        tag: tag,
+                        id: newId,
+                        uploadTime: uploadTime
+                    };
+
+                    const response_file_data = await fetch('/api/file_data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response_file_data.ok) {
+                        const response_file_data_info = await response_file_data.json();
+                        alert('Upload successful!');
+                        // Redirect back to dashboard after success
+                        window.location.href = "/static/index.html"; 
+                    } else {
+                        throw new Error('Metadata upload failed: ' + response_file_data.statusText);
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error: ' + error.message);
+                    // Reset button if failed
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = "Upload Document";
+                }
+            };
+            
+            reader.readAsText(file);
+        });
+    </script>
+
+</body>
+</html>

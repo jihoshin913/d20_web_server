@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+Content-Length: 76
+Content-Type: text/plain
+
+GET /echo HTTP/1.1
+Host: localhost
+User-Agent: curl/8.5.0
+Accept: */*
+

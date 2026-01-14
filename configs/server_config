@@ -1,0 +1,22 @@
+# For deploying to cloud enviornment
+
+server {
+    listen 80;
+    location /echo {
+        handler EchoHandler;
+    }
+    location /static {
+        handler StaticHandler;
+        root /app/static;
+    }
+    location /api {
+        handler CrudHandler;
+        root /app/crud_data;
+    }
+    location /health {
+        handler HealthHandler;
+    }
+    location / {
+        handler NotFoundHandler;
+    }
+}

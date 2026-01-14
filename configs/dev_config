@@ -1,0 +1,30 @@
+# For hosting in local enviornment
+
+server {
+    listen 8080;
+    location /echo {
+        handler EchoHandler;
+    }
+    location /static {
+        handler StaticHandler;
+        root /usr/src/projects/d20/static_content;
+    }
+    location /api {
+        handler CrudHandler;
+        root /usr/src/projects/d20/crud_data;
+    }
+    location /health {
+        handler HealthHandler;
+    }
+    location /archive {
+        handler StaticHandler;
+        root /usr/src/projects/d20/project_content;
+    }
+    location /list {
+        handler StaticHandler;
+        root /usr/src/projects/d20/project_content;
+    }
+    location / {
+        handler NotFoundHandler;
+    }
+}
