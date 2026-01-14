@@ -1,5 +1,5 @@
 # Contributor Documentation
-####  Team d20: Jiho Shin, Tony Yu, Marco, Nikolas
+####  Team d20: Jiho Shin, Tony Yu, Marco Fung, Nikolas Rodriguez
 
 ## Build, Test, Run
 ### Build
